@@ -60,9 +60,6 @@ class YearlyDistribution:
 
         return probabilities
 
-    def distribute_orders(self):
-        return self.distribution.distribute_orders(self.generator.total_orders)
-
     def generate_years(self) -> List[Year]:
         years = []
         for year_obj, probability in zip(self.generator.year, self.probabilities):
@@ -72,25 +69,21 @@ class YearlyDistribution:
     
 class MonthlyDistribution:
     def __init__(self, start_date: datetime, end_date: datetime, total_orders: int, month_probabilities: List[float]):
-        self.yearly_distribution = YearlyDistribution(start_date, end_date, total_orders)
         self.generator = OrdersGenerator(start_date, end_date, total_orders)
-        self.validate_month_probabilities(month_probabilities)
         self.probabilities = month_probabilities
         self.distribution = Distribution(probabilities=self.probabilities)
+        self.yearly_distribution = YearlyDistribution(start_date, end_date, total_orders)
         self.month_probabilities = self.calculate_probabilities()
+        self.validate_month_probabilities(month_probabilities)
 
     def validate_month_probabilities(self, month_probabilities: List[float]):
-        if not (1 <= len(month_probabilities) <= 12):
-            raise ValueError(f"The number of month probabilities should be between 1 and 12. Got {len(month_probabilities)}.")
+        if len(month_probabilities) != 12:
+            raise ValueError(f"Please provide probabilities for every month in a year. Got {len(month_probabilities)}.")
         
         Distribution.validate_probabilities({"probabilities": month_probabilities})
 
     def calculate_probabilities(self) -> List[float]:
         month_count = len(self.generator.month)
-
-        extended_probabilities = (self.probabilities * (month_count // len(self.probabilities))) + \
-                                  self.probabilities[:month_count % len(self.probabilities)]
-        
         adjusted_probabilities = [0] * month_count
 
         for i, month_obj in enumerate(self.generator.month):
@@ -99,17 +92,29 @@ class MonthlyDistribution:
             if i == 0:  # First month
                 end_of_month = datetime(month_obj.year, month_obj.month, total_days_in_month)
                 days_remaining = (end_of_month - self.generator.start_date).days + 1
-                adjusted_probabilities[i] = extended_probabilities[i] * (days_remaining / total_days_in_month)
+                adjusted_probabilities[i] = days_remaining / total_days_in_month
             elif i == month_count - 1:  # Last month
                 days_used = (self.generator.end_date - datetime(month_obj.year, month_obj.month, 1)).days + 1
-                adjusted_probabilities[i] = extended_probabilities[i] * (days_used / total_days_in_month)
+                adjusted_probabilities[i] = days_used / total_days_in_month
             else:  # Middle months
-                adjusted_probabilities[i] = extended_probabilities[i]
+                adjusted_probabilities[i] = 1
 
-        total_adjusted_prob = sum(adjusted_probabilities)
-        self.normalized_probabilities = [prob / total_adjusted_prob for prob in adjusted_probabilities]
-        
-        return self.normalized_probabilities
+        combined_probabilities = [self.probabilities[(month_obj.month - 1) % 12] * adjusted_probabilities[i] for i, month_obj in enumerate(self.generator.month)]
+
+        year_indices = {}
+        for i, month_obj in enumerate(self.generator.month):
+            if month_obj.year not in year_indices:
+                year_indices[month_obj.year] = []
+            year_indices[month_obj.year].append(i)
+
+        normalized_probabilities = [0] * month_count
+        for year, indices in year_indices.items():
+            year_combined_probabilities = [combined_probabilities[i] for i in indices]
+            total_year_combined_prob = sum(year_combined_probabilities)
+            for i in indices:
+                normalized_probabilities[i] = combined_probabilities[i] / total_year_combined_prob
+
+        return normalized_probabilities
     
     def generate_months(self) -> List[Month]:
         months = []
@@ -119,4 +124,3 @@ class MonthlyDistribution:
             month = Month(year=month_obj.year, year_probability=year_probability, month=month_obj.month, month_probability= month_probability)
             months.append(month)
         return months
-
