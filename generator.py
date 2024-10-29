@@ -1,5 +1,5 @@
 from periods.noiser import Noiser
-from periods.periods import Hour, Day, Month, Year
+from periods.schemas import Hour, Day, Month, Year
 
 from pydantic import ValidationError, BaseModel
 from typing import List, Union, Any, Type

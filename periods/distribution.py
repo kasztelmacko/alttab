@@ -3,13 +3,14 @@ from typing import List, Optional, Literal
 from datetime import datetime, timedelta
 import calendar
 
-from periods.periods import Hour, Day, Month, Year
+from periods.schemas import Hour, Day, Month, Year
+from periods.noiser import Noiser
 
 from generator import OrdersGenerator
 
-
 class Distribution(BaseModel):
     probabilities: List[float] = Field(..., description="probability distribution for given period")
+    noise_std_dev: Optional[float] = Field(None, description="Standard deviation for noise to be applied to probabilities")
 
     @classmethod
     def validate_probabilities(cls, values):
@@ -34,11 +35,18 @@ class Distribution(BaseModel):
         
         return int_orders
 
+    def apply_noise(self) -> List[float]:
+        if self.noise_std_dev is not None:
+            noiser = Noiser(self.noise_std_dev)
+            self.probabilities = noiser.apply_noise(self.probabilities)
+        return self.probabilities
+
 class YearlyDistribution:
-    def __init__(self, start_date: datetime, end_date: datetime, total_orders: int):
+    def __init__(self, start_date: datetime, end_date: datetime, total_orders: int, noise_std_dev: Optional[float] = None):
         self.generator = OrdersGenerator(start_date, end_date, total_orders)
         self.probabilities = self.calculate_probabilities()
-        self.distribution = Distribution(probabilities=self.probabilities)
+        self.distribution = Distribution(probabilities=self.probabilities, noise_std_dev=noise_std_dev)
+        self.distribution.apply_noise()
 
     def calculate_probabilities(self) -> List[float]:
         probabilities = []
@@ -62,19 +70,19 @@ class YearlyDistribution:
 
     def generate_years(self) -> List[Year]:
         years = []
-        for year_obj, probability in zip(self.generator.year, self.probabilities):
+        for year_obj, probability in zip(self.generator.year, self.distribution.probabilities):
             year = Year(year=year_obj.year, year_probability=probability)
             years.append(year)
         return years
     
 class MonthlyDistribution:
-    def __init__(self, start_date: datetime, end_date: datetime, total_orders: int, month_probabilities: List[float]):
+    def __init__(self, start_date: datetime, end_date: datetime, total_orders: int, month_probabilities: List[float], noise_std_dev: Optional[float] = None):
         self.generator = OrdersGenerator(start_date, end_date, total_orders)
-        self.probabilities = month_probabilities
-        self.distribution = Distribution(probabilities=self.probabilities)
-        self.yearly_distribution = YearlyDistribution(start_date, end_date, total_orders)
-        self.month_probabilities = self.calculate_probabilities()
         self.validate_month_probabilities(month_probabilities)
+        self.distribution = Distribution(probabilities=month_probabilities, noise_std_dev=noise_std_dev)
+        self.distribution.apply_noise()
+        self.month_probabilities = self.calculate_probabilities()
+        self.yearly_distribution = YearlyDistribution(start_date, end_date, total_orders, noise_std_dev)
 
     def validate_month_probabilities(self, month_probabilities: List[float]):
         if len(month_probabilities) != 12:
@@ -99,7 +107,7 @@ class MonthlyDistribution:
             else:  # Middle months
                 adjusted_probabilities[i] = 1
 
-        combined_probabilities = [self.probabilities[(month_obj.month - 1) % 12] * adjusted_probabilities[i] for i, month_obj in enumerate(self.generator.month)]
+        combined_probabilities = [self.distribution.probabilities[(month_obj.month - 1) % 12] * adjusted_probabilities[i] for i, month_obj in enumerate(self.generator.month)]
 
         year_indices = {}
         for i, month_obj in enumerate(self.generator.month):
@@ -115,12 +123,76 @@ class MonthlyDistribution:
                 normalized_probabilities[i] = combined_probabilities[i] / total_year_combined_prob
 
         return normalized_probabilities
-    
+
     def generate_months(self) -> List[Month]:
         months = []
         for i, month_obj in enumerate(self.generator.month):
             year_probability = next(year.year_probability for year in self.yearly_distribution.generate_years() if year.year == month_obj.year)
             month_probability = self.month_probabilities[i]
-            month = Month(year=month_obj.year, year_probability=year_probability, month=month_obj.month, month_probability= month_probability)
+            month = Month(year=month_obj.year, year_probability=year_probability, month=month_obj.month, month_probability=month_probability)
             months.append(month)
         return months
+    
+# class DailyDistribution:
+#     def __init__(self, start_date: datetime, end_date: datetime, total_orders: int, month_probabilities: List[float], day_of_week_factor: Optional[List[float]] = None, day_of_month_factor: Optional[List[float]] = None, noise_std_dev: Optional[float] = None):
+#         self.generator = OrdersGenerator(start_date, end_date, total_orders)
+#         self.day_of_week_factor = day_of_week_factor if day_of_week_factor else [1.0] * 7
+#         self.day_of_month_factor = day_of_month_factor if day_of_month_factor else [1.0] * 31
+#         self.distribution = Distribution(probabilities=[1.0 / 7] * 7, noise_std_dev=noise_std_dev)
+#         self.yearly_distribution = YearlyDistribution(start_date, end_date, total_orders, noise_std_dev)
+#         self.monthly_distribution = MonthlyDistribution(start_date, end_date, total_orders, month_probabilities, noise_std_dev)
+#         self.validate_factors()
+#         self.day_probabilities = self.calculate_probabilities()
+#         self.distribution.apply_noise()
+
+#     def validate_factors(self):
+#         if len(self.day_of_week_factor) != 7:
+#             raise ValueError(f"Please provide factors for every day in a week. Got {len(self.day_of_week_factor)}.")
+#         if len(self.day_of_month_factor) != 31:
+#             raise ValueError(f"Please provide factors for every day in a month. Got {len(self.day_of_month_factor)}.")
+
+#     def calculate_probabilities(self) -> List[float]:
+#         day_count = len(self.generator.day)
+#         adjusted_probabilities = [0] * day_count
+
+#         for i, day_obj in enumerate(self.generator.day):
+#             total_days_in_month = calendar.monthrange(day_obj.year, day_obj.month)[1]
+
+#             if i == 0:  # First day
+#                 end_of_day = datetime(day_obj.year, day_obj.month, day_obj.day_in_month)
+#                 days_remaining = (end_of_day - self.generator.start_date).days + 1
+#                 adjusted_probabilities[i] = days_remaining / total_days_in_month
+#             elif i == day_count - 1:  # Last day
+#                 days_used = (self.generator.end_date - datetime(day_obj.year, day_obj.month, day_obj.day_in_month)).days + 1
+#                 adjusted_probabilities[i] = days_used / total_days_in_month
+#             else:  # Middle days
+#                 adjusted_probabilities[i] = 1
+
+#         combined_probabilities = [self.day_of_week_factor[day_obj.weekday] * self.day_of_month_factor[day_obj.day_in_month - 1] * adjusted_probabilities[i] for i, day_obj in enumerate(self.generator.day)]
+
+#         month_indices = {}
+#         for i, day_obj in enumerate(self.generator.day):
+#             month_key = (day_obj.year, day_obj.month)
+#             if month_key not in month_indices:
+#                 month_indices[month_key] = []
+#             month_indices[month_key].append(i)
+
+#         normalized_probabilities = [0] * day_count
+#         for month_key, indices in month_indices.items():
+#             month_combined_probabilities = [combined_probabilities[i] for i in indices]
+#             total_month_combined_prob = sum(month_combined_probabilities)
+#             for i in indices:
+#                 normalized_probabilities[i] = combined_probabilities[i] / total_month_combined_prob
+
+#         return normalized_probabilities
+
+#     def generate_days(self) -> List[Day]:
+#         days = []
+#         for i, day_obj in enumerate(self.generator.day):
+#             year_probability = next(year.year_probability for year in self.yearly_distribution.generate_years() if year.year == day_obj.year)
+#             month_probability = next(month.month_probability for month in self.monthly_distribution.generate_months() if month.year == day_obj.year and month.month == day_obj.month)
+#             day_probability = self.distribution.probabilities[i]
+#             day = Day(year=day_obj.year, year_probability=year_probability, month=day_obj.month, month_probability=month_probability, day_in_month=day_obj.day_in_month, weekday=day_obj.weekday, day_probability=day_probability)
+#             days.append(day)
+#         return days
+
