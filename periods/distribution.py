@@ -80,7 +80,6 @@ class MonthlyDistribution:
         self.generator = OrdersGenerator(start_date, end_date, total_orders)
         self.validate_month_probabilities(month_probabilities)
         self.distribution = Distribution(probabilities=month_probabilities, noise_std_dev=noise_std_dev)
-        self.distribution.apply_noise()
         self.month_probabilities = self.calculate_probabilities()
         self.yearly_distribution = YearlyDistribution(start_date, end_date, total_orders, noise_std_dev)
 
@@ -108,19 +107,12 @@ class MonthlyDistribution:
                 adjusted_probabilities[i] = 1
 
         combined_probabilities = [self.distribution.probabilities[(month_obj.month - 1) % 12] * adjusted_probabilities[i] for i, month_obj in enumerate(self.generator.month)]
+        
+        self.distribution.probabilities = combined_probabilities
+        self.distribution.apply_noise()
 
-        year_indices = {}
-        for i, month_obj in enumerate(self.generator.month):
-            if month_obj.year not in year_indices:
-                year_indices[month_obj.year] = []
-            year_indices[month_obj.year].append(i)
-
-        normalized_probabilities = [0] * month_count
-        for year, indices in year_indices.items():
-            year_combined_probabilities = [combined_probabilities[i] for i in indices]
-            total_year_combined_prob = sum(year_combined_probabilities)
-            for i in indices:
-                normalized_probabilities[i] = combined_probabilities[i] / total_year_combined_prob
+        total = sum(self.distribution.probabilities)
+        normalized_probabilities = [prob / total for prob in self.distribution.probabilities]
 
         return normalized_probabilities
 
