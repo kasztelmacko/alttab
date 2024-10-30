@@ -131,9 +131,13 @@ class DailyDistribution:
         self.day_of_week_factor = day_of_week_factor if day_of_week_factor else [1.0] * 7
         self.day_of_month_factor = day_of_month_factor if day_of_month_factor else [1.0] * 31
         self.validate_factors()
-        self.day_probabilities = self.calculate_probabilities()
-        self.distribution = Distribution(probabilities=self.day_probabilities, noise_std_dev=noise_std_dev)
+
+        day_count = len(self.generator.day)
+        uniform_probabilities = [1.0 / day_count] * day_count
+        self.distribution = Distribution(probabilities=uniform_probabilities, noise_std_dev=noise_std_dev)
         self.distribution.apply_noise()
+        self.day_probabilities = self.calculate_probabilities()
+
         self.yearly_distribution = YearlyDistribution(start_date, end_date, total_orders, noise_std_dev)
         self.monthly_distribution = MonthlyDistribution(start_date, end_date, total_orders, month_probabilities, noise_std_dev)
 
@@ -148,7 +152,7 @@ class DailyDistribution:
         adjusted_probabilities = [0] * day_count
 
         for i, day_obj in enumerate(self.generator.day):
-            adjusted_probabilities[i] = self.day_of_month_factor[day_obj.day_in_month - 1] * self.day_of_week_factor[day_obj.weekday]
+            adjusted_probabilities[i] = self.day_of_month_factor[day_obj.day_in_month - 1] * self.day_of_week_factor[day_obj.weekday] * self.distribution.probabilities[i]
 
         month_indices = {}
         for i, day_obj in enumerate(self.generator.day):
