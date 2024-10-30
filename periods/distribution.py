@@ -20,20 +20,6 @@ class Distribution(BaseModel):
             raise ValueError("The sum of probabilities must be 1.")
         
         return values
-    
-    def distribute_orders(self, total_orders: int) -> List[int]:
-        raw_orders = [total_orders * prob for prob in self.probabilities]
-        int_orders = [int(order) for order in raw_orders]
-        remainder = total_orders - sum(int_orders)
-
-        fractional_parts = [(i, raw_orders[i] - int_orders[i]) for i in range(len(self.probabilities))]
-        fractional_parts.sort(key=lambda x: x[1], reverse=True)
-
-        for i in range(remainder):
-            index = fractional_parts[i][0]
-            int_orders[index] += 1
-        
-        return int_orders
 
     def apply_noise(self) -> List[float]:
         if self.noise_std_dev is not None:
@@ -121,8 +107,7 @@ class MonthlyDistribution:
         for i, month_obj in enumerate(self.generator.month):
             year_info = yearly_data[month_obj.year]
             month_probability = self.month_probabilities[i]
-            cumulative_probability = year_info.year_probability * month_probability
-            month_total_orders = self.total_orders * cumulative_probability
+            month_total_orders = self.total_orders * month_probability
 
             month = Month(
                 year=month_obj.year,
@@ -247,19 +232,14 @@ class HourlyDistribution:
         num_days = (self.generator.end_date - self.generator.start_date).days + 1
         hour_probabilities_repeated = self.hour_probabilities * num_days
 
-        yearly_data = {year.year: year for year in self.yearly_distribution.generate_years()}
-        monthly_data = {(month.year, month.month): month for month in self.monthly_distribution.generate_months()}
-        daily_data = {(day.year, day.month, day.day_of_month): day for day in self.daily_distribution.generate_days()}
+        daily_data = {(day.year, day.month, day.day_of_month, day.day_of_week): day for day in self.daily_distribution.generate_days()}
 
         for i, hour_obj in enumerate(self.generator.hour):
-            year_info = yearly_data[hour_obj.year]
-            month_info = monthly_data[(hour_obj.year, hour_obj.month)]
-            day_info = daily_data[(hour_obj.year, hour_obj.month, hour_obj.day_of_month)]
+            day_info = daily_data[(hour_obj.year, hour_obj.month, hour_obj.day_of_month, hour_obj.day_of_week)]
             hour_probability = hour_probabilities_repeated[i % 24]
 
             cumulative_probability = (
-                year_info.year_probability * 
-                month_info.month_probability * 
+                day_info.month_probability * 
                 day_info.day_probability * 
                 hour_probability
             )
@@ -267,9 +247,9 @@ class HourlyDistribution:
 
             hour = Hour(
                 year=hour_obj.year,
-                year_probability=year_info.year_probability, 
+                year_probability=day_info.year_probability, 
                 month=hour_obj.month, 
-                month_probability=month_info.month_probability, 
+                month_probability=day_info.month_probability, 
                 day_of_month=hour_obj.day_of_month, 
                 day_of_week=hour_obj.day_of_week, 
                 day_probability=day_info.day_probability, 
