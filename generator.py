@@ -27,9 +27,9 @@ class OrdersGenerator:
             elif period_class == Month:
                 period = period_class(year=current_date.year, month=current_date.month)
             elif period_class == Day:
-                period = period_class(year=current_date.year, month=current_date.month, day_in_month=current_date.day, weekday=current_date.weekday())
+                period = period_class(year=current_date.year, month=current_date.month, day_of_month=current_date.day, day_of_week=current_date.weekday())
             elif period_class == Hour:
-                period = period_class(year=current_date.year, month=current_date.month, day_in_month=current_date.day, weekday=current_date.weekday(), hour_in_day=current_date.hour)
+                period = period_class(year=current_date.year, month=current_date.month, day_of_month=current_date.day, day_of_week=current_date.weekday(), hour_in_day=current_date.hour)
             else:
                 raise ValueError(f"Unsupported period class: {period_class}")
             

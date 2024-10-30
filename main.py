@@ -37,4 +37,4 @@ day = DailyDistribution(
 )
 
 for day in day.generate_days():
-    print(f"y: {day.year}, yp: {day.year_probability}, m: {day.month}, mp: {day.month_probability}, dow: {day.weekday}, dom: {day.day_in_month}, dp: {day.day_probability}")
+    print(f"y: {day.year}, yp: {day.year_probability}, m: {day.month}, mp: {day.month_probability}, dow: {day.day_of_week}, dom: {day.day_of_month}, dp: {day.day_probability}")

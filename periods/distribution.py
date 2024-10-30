@@ -1,6 +1,6 @@
-from pydantic import BaseModel, Field, ValidationError
-from typing import List, Optional, Literal
-from datetime import datetime, timedelta
+from pydantic import BaseModel, Field
+from typing import List, Optional
+from datetime import datetime
 import calendar
 
 from periods.schemas import Hour, Day, Month, Year
@@ -152,7 +152,7 @@ class DailyDistribution:
         adjusted_probabilities = [0] * day_count
 
         for i, day_obj in enumerate(self.generator.day):
-            adjusted_probabilities[i] = self.day_of_month_factor[day_obj.day_in_month - 1] * self.day_of_week_factor[day_obj.weekday] * self.distribution.probabilities[i]
+            adjusted_probabilities[i] = self.day_of_month_factor[day_obj.day_of_month - 1] * self.day_of_week_factor[day_obj.day_of_week] * self.distribution.probabilities[i]
 
         month_indices = {}
         for i, day_obj in enumerate(self.generator.day):
@@ -175,7 +175,7 @@ class DailyDistribution:
             year_probability = next(year.year_probability for year in self.yearly_distribution.generate_years() if year.year == day_obj.year)
             month_probability = next(month.month_probability for month in self.monthly_distribution.generate_months() if month.year == day_obj.year and month.month == day_obj.month)
             day_probability = self.day_probabilities[i]
-            day = Day(year=day_obj.year, year_probability=year_probability, month=day_obj.month, month_probability=month_probability, day_in_month=day_obj.day_in_month, weekday=day_obj.weekday, day_probability=day_probability)
+            day = Day(year=day_obj.year, year_probability=year_probability, month=day_obj.month, month_probability=month_probability, day_of_month=day_obj.day_of_month, day_of_week=day_obj.day_of_week, day_probability=day_probability)
             days.append(day)
         return days
 
