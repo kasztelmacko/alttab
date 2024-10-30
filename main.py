@@ -8,7 +8,7 @@ end_date = datetime(2024, 10, 31)
 total_orders = 1000
 
 month_probabilities = [0.05, 0.05, 0.05, 0.05, 0.05, 0.10, 0.10, 0.20, 0.15, 0.05, 0.05, 0.10]
-hour_probabilities = [0, 0, 0, 0, 0, 0, 0, 0, 0.05, 0.05, 0.07, 0.07, 0.09, 0.09, 0.10, 0.10, 0.11, 0.11, 0.12, 0.14, 0, 0, 0, 0]
+hour_probabilities = [0, 0, 0, 0, 0, 0, 0, 0, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.1, 0.1, 0.1, 0.1, 0.15, 0.15, 0, 0, 0, 0]
 day_of_week_factor = [1, 1, 1, 1, 1, 1.5, 1.5] 
 day_of_month_factor = [1.0] * 31
 
@@ -53,3 +53,4 @@ hourly_distribution = HourlyDistribution(
 
 for hour in hourly_distribution.generate_hours():
     print(f"Year: {hour.year}, Month: {hour.month}, Day: {hour.day_of_month}, Hour: {hour.hour_in_day}, Probability: {hour.hour_probability:.4f}")
+    print(f"Total Orders: {hour.total_orders:.2f}")
