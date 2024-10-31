@@ -61,16 +61,30 @@ class YearlyDistribution:
 
     def generate_years(self) -> List[Year]:
         years = []
+        total_order_count = 0
+        remainders = []
+
         for i, year_obj in enumerate(self.generator.year):
             year_probability = self.year_probabilities[i]
             year_total_orders = self.total_orders * year_probability
 
+            int_orders = int(year_total_orders)
+            total_order_count += int_orders
+
+            remainder = year_total_orders - int_orders
+            remainders.append((remainder, i))
+
             year = Year(
                 year=year_obj.year,
                 year_probability=year_probability,
-                total_orders=year_total_orders
+                total_orders=int_orders
             )
             years.append(year)
+
+        remaining_orders = self.total_orders - total_order_count
+        remainders.sort(reverse=True, key=lambda x: x[0])
+        for _, i in remainders[:remaining_orders]:
+            years[i].total_orders += 1
 
         return years
     
@@ -131,20 +145,34 @@ class MonthlyDistribution:
 
     def generate_months(self) -> List[Month]:
         months = []
+        total_order_count = 0
+        remainders = []
         yearly_data = {year.year: year for year in self.yearly_distribution.generate_years()}
+
         for i, month_obj in enumerate(self.generator.month):
             year_info = yearly_data[month_obj.year]
             month_probability = self.month_probabilities[i]
             month_total_orders = year_info.total_orders * month_probability
 
+            int_orders = int(month_total_orders)
+            total_order_count += int_orders
+
+            remainder = month_total_orders - int_orders
+            remainders.append((remainder, i))
+
             month = Month(
                 year=month_obj.year,
                 year_probability=year_info.year_probability,
-                total_orders=month_total_orders,
+                total_orders=int_orders,
                 month=month_obj.month,
                 month_probability=month_probability
             )
             months.append(month)
+
+        remaining_orders = self.total_orders - total_order_count
+        remainders.sort(reverse=True, key=lambda x: x[0])
+        for _, i in remainders[:remaining_orders]:
+            months[i].total_orders += 1
 
         return months
     
@@ -165,6 +193,7 @@ class DailyDistribution:
         self.distribution = Distribution(probabilities=uniform_probabilities, noise_std_dev=noise_std_dev)
         self.distribution.apply_noise()
         self.day_probabilities = self.calculate_probabilities()
+        self.total_orders = total_orders
 
         self.yearly_distribution = YearlyDistribution(start_date, end_date, total_orders, noise_std_dev)
         self.monthly_distribution = MonthlyDistribution(start_date, end_date, total_orders, month_probabilities, noise_std_dev)
@@ -199,12 +228,20 @@ class DailyDistribution:
 
     def generate_days(self) -> List[Day]:
         days = []
+        total_order_count = 0
+        remainders = []
         monthly_data = {(month.year, month.month): month for month in self.monthly_distribution.generate_months()}
 
         for i, day_obj in enumerate(self.generator.day):
             month_info = monthly_data[(day_obj.year, day_obj.month)]
             day_probability = self.day_probabilities[i]
             day_total_orders = month_info.total_orders * day_probability
+
+            int_orders = int(day_total_orders)
+            total_order_count += int_orders
+            
+            remainder = day_total_orders - int_orders
+            remainders.append((remainder, i))
 
             day = Day(
                 year=day_obj.year,
@@ -214,9 +251,14 @@ class DailyDistribution:
                 day_of_month=day_obj.day_of_month,
                 day_of_week=day_obj.day_of_week,
                 day_probability=day_probability,
-                total_orders=day_total_orders
+                total_orders=int_orders
             )
             days.append(day)
+
+        remaining_orders = self.total_orders - total_order_count
+        remainders.sort(reverse=True, key=lambda x: x[0])
+        for _, i in remainders[:remaining_orders]:
+            days[i].total_orders += 1
 
         return days
 
@@ -232,6 +274,7 @@ class HourlyDistribution:
         self.validate_hour_probabilities(hour_probabilities)
         self.distribution = Distribution(probabilities=hour_probabilities, noise_std_dev=noise_std_dev)
         self.hour_probabilities = self.calculate_probabilities(hour_probabilities)
+        self.total_orders = total_orders
 
         self.yearly_distribution = YearlyDistribution(start_date, end_date, total_orders, noise_std_dev)
         self.monthly_distribution = MonthlyDistribution(start_date, end_date, total_orders, month_probabilities, noise_std_dev)
@@ -268,13 +311,20 @@ class HourlyDistribution:
     
     def generate_hours(self) -> List[Hour]:
         hours = []
+        total_order_count = 0
+        remainders = []
         daily_data = {(day.year, day.month, day.day_of_month, day.day_of_week): day for day in self.daily_distribution.generate_days()}
 
         for i, hour_obj in enumerate(self.generator.hour):
             day_info = daily_data[(hour_obj.year, hour_obj.month, hour_obj.day_of_month, hour_obj.day_of_week)]
-            print(day_info.total_orders)
             hour_probability = self.hour_probabilities[i % 24]
             hour_total_orders = day_info.total_orders * hour_probability
+
+            int_orders = int(hour_total_orders)
+            total_order_count += int_orders
+            
+            remainder = hour_total_orders - int_orders
+            remainders.append((remainder, i))
 
             hour = Hour(
                 year=hour_obj.year,
@@ -286,8 +336,13 @@ class HourlyDistribution:
                 day_probability=day_info.day_probability, 
                 hour_in_day=hour_obj.hour_in_day, 
                 hour_probability=hour_probability,
-                total_orders=hour_total_orders
+                total_orders=int_orders
             )
             hours.append(hour)
+
+        remaining_orders = self.total_orders - total_order_count
+        remainders.sort(reverse=True, key=lambda x: x[0])
+        for _, i in remainders[:remaining_orders]:
+            hours[i].total_orders += 1
 
         return hours

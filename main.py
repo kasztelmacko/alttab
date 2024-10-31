@@ -4,8 +4,8 @@ from datetime import datetime
 import random
 
 start_date = datetime(2025, 1, 2)
-end_date = datetime(2025, 1, 2)
-total_orders = 1000
+end_date = datetime(2025, 1, 31)
+total_orders = 10000
 
 month_probabilities = [0.05, 0.05, 0.05, 0.05, 0.05, 0.10, 0.10, 0.20, 0.15, 0.05, 0.05, 0.10]
 hour_probabilities = [0, 0, 0, 0, 0, 0, 0, 0, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.1, 0.1, 0.1, 0.1, 0.15, 0.15, 0, 0, 0, 0]
@@ -43,22 +43,22 @@ noise_std_dev = 0
 #     sum += month.total_orders
 # print(sum)
 
-# day = DailyDistribution(
-#     start_date=start_date,
-#     end_date=end_date,
-#     total_orders=total_orders,
-#     month_probabilities=month_probabilities,
-#     day_of_week_factor=day_of_week_factor,
-#     day_of_month_factor=day_of_month_factor,
-#     noise_std_dev=noise_std_dev
-# )
-# sum = 0
-# for day in day.generate_days():
-#     print(f"year: {day.year}, month: {day.month}, day_ow: {day.day_of_week}, day_om: {day.day_of_month}, yp: {day.year_probability:.2f}, mp: {day.month_probability:.2f}, dp: {day.day_probability:.2f}")
-#     print(f"Orders {day.total_orders}")
-#     sum += day.total_orders
+day = DailyDistribution(
+    start_date=start_date,
+    end_date=end_date,
+    total_orders=total_orders,
+    month_probabilities=month_probabilities,
+    day_of_week_factor=day_of_week_factor,
+    day_of_month_factor=day_of_month_factor,
+    noise_std_dev=noise_std_dev
+)
+sum = 0
+for day in day.generate_days():
+    print(f"year: {day.year}, month: {day.month}, day_ow: {day.day_of_week}, day_om: {day.day_of_month}, yp: {day.year_probability:.2f}, mp: {day.month_probability:.2f}, dp: {day.day_probability:.2f}")
+    print(f"Orders {day.total_orders}")
+    sum += day.total_orders
 
-# print(sum)
+print(sum)
 
 # hour = HourlyDistribution(
 #     start_date=start_date,
