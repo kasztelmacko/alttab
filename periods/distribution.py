@@ -6,7 +6,7 @@ import calendar
 from periods.schemas import Hour, Day, Month, Year
 from periods.noiser import Noiser
 
-from generator import Generator
+from periods.generator import Generator
 
 class Distribution(BaseModel):
     probabilities: List[float] = Field(..., description="probability distribution for given period")
