@@ -6,7 +6,7 @@ import calendar
 from periods.schemas import Hour, Day, Month, Year
 from periods.noiser import Noiser
 
-from generator import OrdersGenerator
+from generator import Generator
 
 class Distribution(BaseModel):
     probabilities: List[float] = Field(..., description="probability distribution for given period")
@@ -30,7 +30,7 @@ class Distribution(BaseModel):
 class YearlyDistribution:
     def __init__(self, start_date: datetime, end_date: datetime, total_orders: int, 
                  noise_std_dev: Optional[float] = None):
-        self.generator = OrdersGenerator(start_date, end_date, total_orders)
+        self.generator = Generator(start_date, end_date, total_orders)
         self.year_probabilities = self.calculate_probabilities()
         self.distribution = Distribution(probabilities=self.year_probabilities, noise_std_dev=noise_std_dev)
         self.distribution.probabilities = self.year_probabilities
@@ -93,7 +93,7 @@ class MonthlyDistribution:
                  month_probabilities: List[float], 
                  noise_std_dev: Optional[float] = None):
         
-        self.generator = OrdersGenerator(start_date, end_date, total_orders)
+        self.generator = Generator(start_date, end_date, total_orders)
         self.validate_month_probabilities(month_probabilities)
         self.distribution = Distribution(probabilities=month_probabilities, noise_std_dev=noise_std_dev)
         self.month_probabilities = self.calculate_probabilities()
@@ -183,7 +183,7 @@ class DailyDistribution:
                  day_of_month_factor: Optional[List[float]] = None, 
                  noise_std_dev: Optional[float] = None):
         
-        self.generator = OrdersGenerator(start_date, end_date, total_orders)
+        self.generator = Generator(start_date, end_date, total_orders)
         self.day_of_week_factor = day_of_week_factor if day_of_week_factor else [1.0] * 7
         self.day_of_month_factor = day_of_month_factor if day_of_month_factor else [1.0] * 31
         self.validate_factors()
@@ -270,7 +270,7 @@ class HourlyDistribution:
                  day_of_month_factor: Optional[List[float]] = None, 
                  noise_std_dev: Optional[float] = None):
         
-        self.generator = OrdersGenerator(start_date, end_date, total_orders)
+        self.generator = Generator(start_date, end_date, total_orders)
         self.validate_hour_probabilities(hour_probabilities)
         self.distribution = Distribution(probabilities=hour_probabilities, noise_std_dev=noise_std_dev)
         self.hour_probabilities = self.calculate_probabilities(hour_probabilities)

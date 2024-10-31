@@ -7,7 +7,7 @@ from typing import List, Union, Any, Type
 from datetime import datetime, timedelta
 
 
-class OrdersGenerator:
+class Generator:
     def __init__(self, start_date: datetime, end_date: datetime, total_orders: int):
         self.start_date = start_date
         self.end_date = end_date
