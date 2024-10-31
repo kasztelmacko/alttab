@@ -9,17 +9,6 @@ import polars as pl
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-start_date = datetime(2025, 1, 1)
-end_date = datetime(2025, 1, 31)
-total_orders = 1000
-
-month_probabilities = [0.05, 0.05, 0.05, 0.05, 0.05, 0.10, 0.10, 0.20, 0.15, 0.05, 0.05, 0.10]
-day_of_week_factor = [1, 1, 1, 1, 1, 1.5, 1.5] 
-day_of_month_factor = [1.0] * 31
-hour_probabilities = [0, 0, 0, 0, 0, 0, 0, 0, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.1, 0.1, 0.1, 0.1, 0.15, 0.15, 0, 0, 0, 0]
-
-noise_std_dev = 0.2
-
 class OrderDistributionGenerator:
     def __init__(self, start_date: datetime, end_date: datetime, total_orders: int, 
                  month_probabilities: Optional[List[float]] = None, 
@@ -31,29 +20,38 @@ class OrderDistributionGenerator:
         self.start_date = start_date
         self.end_date = end_date
         self.total_orders = total_orders
-        self.month_probabilities = month_probabilities if month_probabilities else [1.0] * 12
+        self.month_probabilities = month_probabilities if month_probabilities else [1.0 / 12] * 12
         self.day_of_week_factor = day_of_week_factor if day_of_week_factor else [1.0] * 7
         self.day_of_month_factor = day_of_month_factor if day_of_month_factor else [1.0] * 31
         self.hour_probabilities = hour_probabilities if hour_probabilities else [1.0 / 24] * 24
         self.noise_std_dev = noise_std_dev
 
-        self.yearly_distribution = YearlyDistribution(start_date, end_date, total_orders, noise_std_dev)
-        self.monthly_distribution = MonthlyDistribution(start_date, end_date, total_orders, month_probabilities, noise_std_dev)
-        self.daily_distribution = DailyDistribution(start_date, end_date, total_orders, month_probabilities, day_of_week_factor, day_of_month_factor, noise_std_dev)
-        self.hourly_distribution = HourlyDistribution(start_date, end_date, total_orders, month_probabilities, hour_probabilities, day_of_week_factor, day_of_month_factor, noise_std_dev)
+    def get_distribution(self, distribution_type: str):
+        if distribution_type == 'year':
+            generator =  YearlyDistribution(self.start_date, self.end_date, self.total_orders, self.noise_std_dev)
+            return generator.generate_years()
+        elif distribution_type == 'month':
+            generator =  MonthlyDistribution(self.start_date, self.end_date, self.total_orders, self.month_probabilities, self.noise_std_dev)
+            return generator.generate_months()
+        elif distribution_type == 'day':
+            generator =  DailyDistribution(self.start_date, self.end_date, self.total_orders, self.month_probabilities, self.day_of_week_factor, self.day_of_month_factor, self.noise_std_dev)
+            return generator.generate_days()
+        elif distribution_type == 'hour':
+            generator =  HourlyDistribution(self.start_date, self.end_date, self.total_orders, self.month_probabilities, self.hour_probabilities, self.day_of_week_factor, self.day_of_month_factor, self.noise_std_dev)
+            return generator.generate_hours()
+        else:
+            raise ValueError("Invalid distribution type. Choose from 'year', 'month', 'day', 'hour'.")
 
     def print_orders_cumulated(self, distribution_type: str):
+        generator = self.get_distribution(distribution_type)
+        
         if distribution_type == 'year':
-            generator = self.yearly_distribution.generate_years()
             format_str = "Year: {year}, Year prob {year_probability:.4f}, Orders {total_orders}"
         elif distribution_type == 'month':
-            generator = self.monthly_distribution.generate_months()
             format_str = "Year: {year}, Month: {month}, Year prob {year_probability:.4f}, Month Probability: {month_probability:.4f}, Orders {total_orders}"
         elif distribution_type == 'day':
-            generator = self.daily_distribution.generate_days()
             format_str = "Year: {year}, Month: {month}, Day of Week: {day_of_week}, Day of Month: {day_of_month}, Year Probability: {year_probability:.2f}, Month Probability: {month_probability:.2f}, Day Probability: {day_probability:.2f}, Orders {total_orders}"
         elif distribution_type == 'hour':
-            generator = self.hourly_distribution.generate_hours()
             format_str = "Year: {year}, Month: {month}, Day of Week: {day_of_week}, Day of Month: {day_of_month}, Hour: {hour_in_day}, Year Probability: {year_probability:.2f}, Month Probability: {month_probability:.2f}, Day Probability: {day_probability:.2f}, Hour Probability: {hour_probability:.2f}, Orders {total_orders}"
         else:
             raise ValueError("Invalid distribution type. Choose from 'year', 'month', 'day', 'hour'.")
@@ -65,19 +63,15 @@ class OrderDistributionGenerator:
         print(f"Total Orders: {sum_orders}")
 
     def plot_orders_cumulated(self, distribution_type: str):
-
-    
+        generator = self.get_distribution(distribution_type)
+        
         if distribution_type == 'year':
-            generator = self.yearly_distribution.generate_years()
             x_label = 'Year'
         elif distribution_type == 'month':
-            generator = self.monthly_distribution.generate_months()
             x_label = 'Year-Month'
         elif distribution_type == 'day':
-            generator = self.daily_distribution.generate_days()
             x_label = 'Year-Month-Day'
         elif distribution_type == 'hour':
-            generator = self.hourly_distribution.generate_hours()
             x_label = 'Year-Month-Day-Hour'
         else:
             raise ValueError("Invalid distribution type. Choose from 'year', 'month', 'day', 'hour'.")
@@ -108,22 +102,16 @@ class OrderDistributionGenerator:
                         allow_order_multiple: Optional[bool] = False,
                         order_multiple_probability: Optional[float] = None) -> pl.DataFrame:
         
+        generator = self.get_distribution(distribution_type)
+        
         if distribution_type == 'year':
-            generator = self.yearly_distribution.generate_years()
             time_col_names = ['year']
-            time_generator = generator
         elif distribution_type == 'month':
-            generator = self.monthly_distribution.generate_months()
             time_col_names = ['year', 'month']
-            time_generator = generator
         elif distribution_type == 'day':
-            generator = self.daily_distribution.generate_days()
             time_col_names = ['year', 'month', 'day_of_month']
-            time_generator = generator
         elif distribution_type == 'hour':
-            generator = self.hourly_distribution.generate_hours()
             time_col_names = ['year', 'month', 'day_of_month', 'hour']
-            time_generator = generator
         else:
             raise ValueError("Invalid distribution_type. Supported types are 'year', 'month', 'day_of_month', 'hour'.")
         
@@ -135,7 +123,7 @@ class OrderDistributionGenerator:
         
         order_id_counter = 1
         
-        for time_info in time_generator:
+        for time_info in generator:
             time_values = [getattr(time_info, col) for col in time_col_names]
             total_orders_for_period = int(time_info.total_orders)
             
@@ -210,27 +198,3 @@ class OrderDistributionGenerator:
         
         print(orders_df)
         return orders_df
-
-
-orders = OrderDistributionGenerator(
-    start_date=start_date,
-    end_date=end_date,
-    total_orders=total_orders,
-    month_probabilities=month_probabilities,
-    day_of_week_factor=day_of_week_factor,
-    day_of_month_factor=day_of_month_factor,
-    hour_probabilities=hour_probabilities,
-    noise_std_dev=noise_std_dev
-)
-
-
-# orders.print_orders_cumulated('day')
-# orders.plot_orders_cumulated('day')
-orders.create_orders_df(distribution_type="day", 
-                        item_data=pl.read_csv("data/items.csv"), 
-                        item_name_col="item_name", 
-                        item_price_col="item_price", 
-                        item_popularity_col="item_reviews_count",
-                        allow_order_multiple=True,
-                        order_multiple_probability=0.8
-                        )
