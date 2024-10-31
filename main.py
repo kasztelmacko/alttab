@@ -27,7 +27,7 @@ class OrderDistributionGenerator:
         self.start_date = start_date
         self.end_date = end_date
         self.total_orders = total_orders
-        self.month_probabilities = month_probabilities
+        self.month_probabilities = month_probabilities if month_probabilities else [1.0] * 12
         self.day_of_week_factor = day_of_week_factor if day_of_week_factor else [1.0] * 7
         self.day_of_month_factor = day_of_month_factor if day_of_month_factor else [1.0] * 31
         self.hour_probabilities = hour_probabilities if hour_probabilities else [1.0 / 24] * 24
@@ -38,7 +38,7 @@ class OrderDistributionGenerator:
         self.daily_distribution = DailyDistribution(start_date, end_date, total_orders, month_probabilities, day_of_week_factor, day_of_month_factor, noise_std_dev)
         self.hourly_distribution = HourlyDistribution(start_date, end_date, total_orders, month_probabilities, hour_probabilities, day_of_week_factor, day_of_month_factor, noise_std_dev)
 
-    def print_orders(self, distribution_type: str):
+    def print_orders_cumulated(self, distribution_type: str):
         if distribution_type == 'year':
             generator = self.yearly_distribution.generate_years()
             format_str = "Year: {year}, Year prob {year_probability:.4f}, Orders {total_orders}"
@@ -60,7 +60,7 @@ class OrderDistributionGenerator:
             sum_orders += item.total_orders
         print(f"Total Orders: {sum_orders}")
 
-    def plot_orders(self, distribution_type: str):
+    def plot_orders_cumulated(self, distribution_type: str):
         if distribution_type == 'year':
             generator = self.yearly_distribution.generate_years()
             x_label = 'Year'
@@ -107,8 +107,8 @@ orders = OrderDistributionGenerator(
     noise_std_dev=noise_std_dev
 )
 
-# orders.print_orders('year')
-# orders.print_orders('month')
-# orders.print_orders('day')
-# orders.print_orders('hour')
-orders.plot_orders('day')
+# orders.print_orders_cumulated('year')
+# orders.print_orders_cumulated('month')
+# orders.print_orders_cumulated('day')
+# orders.print_orders_cumulated('hour')
+orders.plot_orders_cumulated('day')

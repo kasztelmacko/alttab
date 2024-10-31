@@ -6,7 +6,7 @@ This module helps generate synthetic orders based on assumed distributions and f
 
 ## Screenshots
 
-![App Screenshot](https://github.com/kasztelmacko/alttab/blob/master/OrderGenerator.png)
+![App Screenshot](https://github.com/kasztelmacko/alttab/static/blob/master/OrderGenerator.png)
 
 
 ## Features
