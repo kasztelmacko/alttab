@@ -1,13 +1,17 @@
 from periods.distribution import YearlyDistribution, MonthlyDistribution, DailyDistribution, HourlyDistribution
+
 from datetime import datetime
 from typing import List, Optional
+
+import numpy as np
 import polars as pl
+
 import seaborn as sns
 import matplotlib.pyplot as plt
 
 start_date = datetime(2025, 1, 1)
 end_date = datetime(2025, 1, 31)
-total_orders = 10000
+total_orders = 1000
 
 month_probabilities = [0.05, 0.05, 0.05, 0.05, 0.05, 0.10, 0.10, 0.20, 0.15, 0.05, 0.05, 0.10]
 day_of_week_factor = [1, 1, 1, 1, 1, 1.5, 1.5] 
@@ -61,6 +65,8 @@ class OrderDistributionGenerator:
         print(f"Total Orders: {sum_orders}")
 
     def plot_orders_cumulated(self, distribution_type: str):
+
+    
         if distribution_type == 'year':
             generator = self.yearly_distribution.generate_years()
             x_label = 'Year'
@@ -94,6 +100,116 @@ class OrderDistributionGenerator:
         plt.xticks(rotation=45)
         plt.show()
 
+    def create_orders_df(self, distribution_type: str, 
+                        item_data: pl.DataFrame, 
+                        item_name_col: str, 
+                        item_price_col: Optional[str] = None, 
+                        item_popularity_col: Optional[str] = None, 
+                        allow_order_multiple: Optional[bool] = False,
+                        order_multiple_probability: Optional[float] = None) -> pl.DataFrame:
+        
+        if distribution_type == 'year':
+            generator = self.yearly_distribution.generate_years()
+            time_col_names = ['year']
+            time_generator = generator
+        elif distribution_type == 'month':
+            generator = self.monthly_distribution.generate_months()
+            time_col_names = ['year', 'month']
+            time_generator = generator
+        elif distribution_type == 'day':
+            generator = self.daily_distribution.generate_days()
+            time_col_names = ['year', 'month', 'day_of_month']
+            time_generator = generator
+        elif distribution_type == 'hour':
+            generator = self.hourly_distribution.generate_hours()
+            time_col_names = ['year', 'month', 'day_of_month', 'hour']
+            time_generator = generator
+        else:
+            raise ValueError("Invalid distribution_type. Supported types are 'year', 'month', 'day_of_month', 'hour'.")
+        
+        time_periods = {col: [] for col in time_col_names}
+        item_names = []
+        item_prices = []
+        order_ids = []
+        order_dates = []
+        
+        order_id_counter = 1
+        
+        for time_info in time_generator:
+            time_values = [getattr(time_info, col) for col in time_col_names]
+            total_orders_for_period = int(time_info.total_orders)
+            
+            for _ in range(total_orders_for_period):
+                if allow_order_multiple:
+                    num_items = np.random.geometric(p=order_multiple_probability)
+                else:
+                    num_items = 1
+                
+                if item_popularity_col:
+                    weights = item_data[item_popularity_col].to_list()
+                    weights = np.array(weights) / np.sum(weights)
+                    selected_item_names = np.random.choice(
+                        item_data[item_name_col].to_list(),
+                        p=weights,
+                        size=num_items,
+                        replace=True
+                    )
+                else:
+                    selected_item_names = np.random.choice(
+                        item_data[item_name_col].to_list(),
+                        size=num_items,
+                        replace=True
+                    )
+                
+                for col, value in zip(time_col_names, time_values):
+                    time_periods[col].extend([value] * num_items)
+                item_names.extend(selected_item_names)
+                
+                if item_price_col:
+                    item_price_dict = dict(zip(item_data[item_name_col], item_data[item_price_col]))
+                    selected_item_prices = [item_price_dict[item] for item in selected_item_names]
+                    item_prices.extend(selected_item_prices)
+                
+                order_ids.extend([order_id_counter] * num_items)
+                order_id_counter += 1
+                
+                if distribution_type != 'year':
+                    date_format = {
+                        'month': '%Y-%m',
+                        'day': '%Y-%m-%d',
+                        'hour': '%Y-%m-%d %H:%M:%S'
+                    }.get(distribution_type)
+                    
+                    order_date = datetime(
+                        year=time_values[0],
+                        month=time_values[1] if len(time_values) > 1 else 1,
+                        day=time_values[2] if len(time_values) > 2 else 1,
+                        hour=time_values[3] if len(time_values) > 3 else 0
+                    ).strftime(date_format)
+                    order_dates.extend([order_date] * num_items)
+        
+        orders_df = pl.DataFrame({
+            "order_id": order_ids,
+            **time_periods,
+            "item_name": item_names
+        })
+        
+        if item_price_col:
+            orders_df = orders_df.with_columns(pl.Series("item_price", item_prices))
+        
+        if distribution_type != 'year':
+            orders_df = orders_df.with_columns(pl.Series("order_date", order_dates))
+
+        columns = list(orders_df.columns)
+        if 'order_date' in columns:
+            columns.remove('order_date')
+            order_date_index = columns.index('order_id') + 1
+            columns.insert(order_date_index, 'order_date')
+        
+        orders_df = orders_df.select(columns)
+        
+        print(orders_df)
+        return orders_df
 
 
 orders = OrderDistributionGenerator(
@@ -107,8 +223,14 @@ orders = OrderDistributionGenerator(
     noise_std_dev=noise_std_dev
 )
 
-# orders.print_orders_cumulated('year')
-# orders.print_orders_cumulated('month')
+
 # orders.print_orders_cumulated('day')
-# orders.print_orders_cumulated('hour')
-orders.plot_orders_cumulated('day')
+# orders.plot_orders_cumulated('day')
+orders.create_orders_df(distribution_type="day", 
+                        item_data=pl.read_csv("data/items.csv"), 
+                        item_name_col="item_name", 
+                        item_price_col="item_price", 
+                        item_popularity_col="item_reviews_count",
+                        allow_order_multiple=True,
+                        order_multiple_probability=0.8
+                        )
