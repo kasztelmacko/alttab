@@ -21,6 +21,7 @@ class OrdersGenerator:
     def generate_periods(self, period_class: Type[Year] | Type[Month] | Type[Day] | Type[Hour]) -> List[Year | Month | Day | Hour]:
         periods = []
         current_date = self.start_date
+        
         while current_date <= self.end_date:
             if period_class == Year:
                 period = period_class(year=current_date.year)
@@ -29,7 +30,11 @@ class OrdersGenerator:
             elif period_class == Day:
                 period = period_class(year=current_date.year, month=current_date.month, day_of_month=current_date.day, day_of_week=current_date.weekday())
             elif period_class == Hour:
-                period = period_class(year=current_date.year, month=current_date.month, day_of_month=current_date.day, day_of_week=current_date.weekday(), hour_in_day=current_date.hour)
+                for hour_in_day in range(24):
+                    period = period_class(year=current_date.year, month=current_date.month, day_of_month=current_date.day, day_of_week=current_date.weekday(), hour_in_day=hour_in_day)
+                    periods.append(period)
+                current_date += timedelta(days=1)
+                continue
             else:
                 raise ValueError(f"Unsupported period class: {period_class}")
             
@@ -44,8 +49,6 @@ class OrdersGenerator:
                     current_date = datetime(current_date.year, current_date.month + 1, 1)
             elif period_class == Day:
                 current_date += timedelta(days=1)
-            elif period_class == Hour:
-                current_date += timedelta(hours=1)
         
         return periods
 
