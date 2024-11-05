@@ -28,9 +28,14 @@ class Distribution(BaseModel):
         return self.probabilities
 
 class YearlyDistribution:
-    def __init__(self, start_date: datetime, end_date: datetime, total_orders: int, 
-                 noise_std_dev: Optional[float] = None):
+    def __init__(self, start_date: datetime, 
+                 end_date: datetime, 
+                 total_orders: int, 
+                 noise_std_dev: Optional[float] = None, 
+                 linear_trend: Optional[float] = 0.0):
+        
         self.generator = Generator(start_date, end_date, total_orders)
+        self.linear_trend = linear_trend
         self.year_probabilities = self.calculate_probabilities()
         self.distribution = Distribution(probabilities=self.year_probabilities, noise_std_dev=noise_std_dev)
         self.distribution.probabilities = self.year_probabilities
@@ -42,8 +47,9 @@ class YearlyDistribution:
     def calculate_probabilities(self) -> List[float]:
         probabilities = []
         total_days = (self.generator.end_date - self.generator.start_date).days + 1
+        num_years = len(self.generator.year)
 
-        for year in self.generator.year:
+        for i, year in enumerate(self.generator.year):
             year_start = datetime(year.year, 1, 1)
             year_end = datetime(year.year, 12, 31)
 
@@ -54,8 +60,16 @@ class YearlyDistribution:
 
             year_days = (year_end - year_start).days + 1
             year_probability = year_days / total_days
+
+            if self.linear_trend != 0 and num_years > 1:
+                trend_factor = 1 + self.linear_trend * (i / (num_years - 1))
+                year_probability *= trend_factor
+
             year.year_probability = year_probability
             probabilities.append(year_probability)
+
+        total_probability = sum(probabilities)
+        probabilities = [prob / total_probability for prob in probabilities]
 
         return probabilities
 
@@ -89,16 +103,20 @@ class YearlyDistribution:
         return years
     
 class MonthlyDistribution:
-    def __init__(self, start_date: datetime, end_date: datetime, total_orders: int, 
+    def __init__(self, start_date: datetime, 
+                 end_date: datetime, 
+                 total_orders: int, 
                  month_probabilities: List[float], 
-                 noise_std_dev: Optional[float] = None):
+                 noise_std_dev: Optional[float] = None, 
+                 linear_trend: Optional[float] = 0.0):
         
         self.generator = Generator(start_date, end_date, total_orders)
+        self.linear_trend = linear_trend
         self.validate_month_probabilities(month_probabilities)
         self.distribution = Distribution(probabilities=month_probabilities, noise_std_dev=noise_std_dev)
         self.month_probabilities = self.calculate_probabilities()
         self.total_orders = total_orders
-        self.yearly_distribution = YearlyDistribution(start_date, end_date, total_orders, noise_std_dev)
+        self.yearly_distribution = YearlyDistribution(start_date, end_date, total_orders, noise_std_dev, linear_trend)
 
     def validate_month_probabilities(self, month_probabilities: List[float]):
         if len(month_probabilities) != 12:
@@ -124,6 +142,11 @@ class MonthlyDistribution:
                 adjusted_probabilities[i] = 1
 
         combined_probabilities = [self.distribution.probabilities[(month_obj.month - 1) % 12] * adjusted_probabilities[i] for i, month_obj in enumerate(self.generator.month)]
+
+        if self.linear_trend != 0 and month_count > 1:
+            for i in range(month_count):
+                trend_factor = 1 + self.linear_trend * (i / (month_count - 1))
+                combined_probabilities[i] *= trend_factor
 
         self.distribution.probabilities = combined_probabilities
         self.distribution.apply_noise()
@@ -177,11 +200,14 @@ class MonthlyDistribution:
         return months
     
 class DailyDistribution:
-    def __init__(self, start_date: datetime, end_date: datetime, total_orders: int, 
+    def __init__(self, start_date: datetime, 
+                 end_date: datetime, 
+                 total_orders: int, 
                  month_probabilities: List[float], 
                  day_of_week_factor: Optional[List[float]] = None, 
                  day_of_month_factor: Optional[List[float]] = None, 
-                 noise_std_dev: Optional[float] = None):
+                 noise_std_dev: Optional[float] = None,
+                 linear_trend: Optional[float] = 0.0):
         
         self.generator = Generator(start_date, end_date, total_orders)
         self.day_of_week_factor = day_of_week_factor if day_of_week_factor else [1.0] * 7
@@ -195,8 +221,8 @@ class DailyDistribution:
         self.day_probabilities = self.calculate_probabilities()
         self.total_orders = total_orders
 
-        self.yearly_distribution = YearlyDistribution(start_date, end_date, total_orders, noise_std_dev)
-        self.monthly_distribution = MonthlyDistribution(start_date, end_date, total_orders, month_probabilities, noise_std_dev)
+        self.yearly_distribution = YearlyDistribution(start_date, end_date, total_orders, noise_std_dev, linear_trend)
+        self.monthly_distribution = MonthlyDistribution(start_date, end_date, total_orders, month_probabilities, noise_std_dev, linear_trend)
 
     def validate_factors(self):
         if len(self.day_of_week_factor) != 7:
@@ -263,12 +289,15 @@ class DailyDistribution:
         return days
 
 class HourlyDistribution:
-    def __init__(self, start_date: datetime, end_date: datetime, total_orders: int, 
+    def __init__(self, start_date: datetime, 
+                 end_date: datetime, 
+                 total_orders: int, 
                  month_probabilities: List[float], 
                  hour_probabilities: List[float], 
                  day_of_week_factor: Optional[List[float]] = None, 
                  day_of_month_factor: Optional[List[float]] = None, 
-                 noise_std_dev: Optional[float] = None):
+                 noise_std_dev: Optional[float] = None,
+                 linear_trend: Optional[float] = 0.0):
         
         self.generator = Generator(start_date, end_date, total_orders)
         self.validate_hour_probabilities(hour_probabilities)
@@ -276,9 +305,9 @@ class HourlyDistribution:
         self.hour_probabilities = self.calculate_probabilities(hour_probabilities)
         self.total_orders = total_orders
 
-        self.yearly_distribution = YearlyDistribution(start_date, end_date, total_orders, noise_std_dev)
-        self.monthly_distribution = MonthlyDistribution(start_date, end_date, total_orders, month_probabilities, noise_std_dev)
-        self.daily_distribution = DailyDistribution(start_date, end_date, total_orders, month_probabilities, day_of_week_factor, day_of_month_factor, noise_std_dev)
+        self.yearly_distribution = YearlyDistribution(start_date, end_date, total_orders, noise_std_dev, linear_trend)
+        self.monthly_distribution = MonthlyDistribution(start_date, end_date, total_orders, month_probabilities, noise_std_dev, linear_trend)
+        self.daily_distribution = DailyDistribution(start_date, end_date, total_orders, month_probabilities, day_of_week_factor, day_of_month_factor, noise_std_dev, linear_trend)
 
     def validate_hour_probabilities(self, hour_probabilities: List[float]):
         if len(hour_probabilities) != 24:

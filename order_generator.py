@@ -15,11 +15,13 @@ class OrderDistributionGenerator:
                  day_of_week_factor: Optional[List[float]] = None, 
                  day_of_month_factor: Optional[List[float]] = None, 
                  hour_probabilities: Optional[List[float]] = None, 
+                 linear_trend: Optional[float] = 0.0,
                  noise_std_dev: Optional[float] = None):
         
         self.start_date = start_date
         self.end_date = end_date
         self.total_orders = total_orders
+        self.linear_trend = linear_trend if linear_trend else 0.0
         self.month_probabilities = month_probabilities if month_probabilities else [1.0 / 12] * 12
         self.day_of_week_factor = day_of_week_factor if day_of_week_factor else [1.0] * 7
         self.day_of_month_factor = day_of_month_factor if day_of_month_factor else [1.0] * 31
@@ -28,10 +30,10 @@ class OrderDistributionGenerator:
 
     def get_distribution(self, distribution_type: str):
         if distribution_type == 'year':
-            generator =  YearlyDistribution(self.start_date, self.end_date, self.total_orders, self.noise_std_dev)
+            generator =  YearlyDistribution(self.start_date, self.end_date, self.total_orders, self.noise_std_dev, self.linear_trend)
             return generator.generate_years()
         elif distribution_type == 'month':
-            generator =  MonthlyDistribution(self.start_date, self.end_date, self.total_orders, self.month_probabilities, self.noise_std_dev)
+            generator =  MonthlyDistribution(self.start_date, self.end_date, self.total_orders, self.month_probabilities, self.noise_std_dev, self.linear_trend)
             return generator.generate_months()
         elif distribution_type == 'day':
             generator =  DailyDistribution(self.start_date, self.end_date, self.total_orders, self.month_probabilities, self.day_of_week_factor, self.day_of_month_factor, self.noise_std_dev)
@@ -198,3 +200,4 @@ class OrderDistributionGenerator:
         
         print(orders_df)
         return orders_df
+    
