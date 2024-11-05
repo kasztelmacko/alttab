@@ -44,5 +44,7 @@ then create an envirometn and
 ## TODO
 
 - ~~Add the DataFrame creator with user given products~~
-- Add linear trend option to YearlyDistribution
+- ~~Add linear trend option to Distributions~~
+- Add product seasonality
+- Add Markov-Chain mode so future order count depends on previous period
 
