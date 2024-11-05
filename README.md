@@ -24,7 +24,8 @@ OrderDistributionGenerator has:
 - month_probabilities: list of probabilites for each month (needed for Monthly, Daily, Hourly Distributions), 
 - day_of_week_factor: list of multipliers for each day of week (Optional)
 - day_of_month_factor: list of multipliers for each day of month (Optional), 
-- hour_probabilities: list of probabilites for each hour (needed for Hourly Distribution), ,  
+- hour_probabilities: list of probabilites for each hour (needed for Hourly Distribution), ,
+- linear_trend: slope of linear trend (only yearly and monthly)
 - noise_std_dev: standard deviation for the noising
 
 
